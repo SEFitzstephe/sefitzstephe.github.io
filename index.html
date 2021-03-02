@@ -21,12 +21,26 @@
     <script src="https://js.arcgis.com/4.18/"></script>
 
  <script>
-      require(["esri/config","esri/Map", "esri/views/MapView"], function (esriConfig,Map, MapView) {
-
-esriConfig.apiKey = "AAPKb22283c075b244e4ab711e1ac7c5063eccxBTaaDTCktzQSLmUDICzBUuobCyuNJLtjMuR36lxpEWpi93jQiD7eXBZTDzco8";
+      require([
+          "esri/config",
+          "esri/Map",
+          "esri/views/MapView",
+          "esri/layers/TileLayer"] // Require the TileLayer module
+          function (esriConfig,Map, MapView, TileLayer)
+          {
+              let transportationLayer = new TileLayer({
+                  url: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer"
+              id: "streets",
+              opacity: 0.7
+              });
+              let housingLayer = new TileLayer({
+                  url: "https://tiles.arcgis.com/tiles/nGt4QxSblgDfeJn9/arcgis/rest/services/New_York_Housing_Density/MapServer"
+              id: ny-housing});
+        esriConfig.apiKey = "AAPKb22283c075b244e4ab711e1ac7c5063eccxBTaaDTCktzQSLmUDICzBUuobCyuNJLtjMuR36lxpEWpi93jQiD7eXBZTDzco8";
 
         const map = new Map({
           basemap: "arcgis-nova" // Basemap layer service
+        layers: [housingLayer]
         });
 const view = new MapView({
           map: map,
