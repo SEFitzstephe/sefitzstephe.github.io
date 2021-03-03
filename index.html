@@ -44,6 +44,7 @@
           basemap: "arcgis-nova", // Basemap layer service
         layers: [housingLayer]
         });
+        map.layers.add(transportationLayer);
 const view = new MapView({
           map: map,
           center: [-120.7415, 35.3295], // Longitude, latitude
