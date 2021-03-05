@@ -1,0 +1,135 @@
+<html xmlns="http://www.w3.org/1999/html">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>Cuesta M.I. </title>
+
+
+    <style>
+        html,
+        body,
+        #viewDiv {
+            padding: 0;
+            margin: 0;
+            height: 600px;
+            width: 100%;
+        }
+        div.container {
+            width: 90%;
+            border: none;
+            margin: auto;
+        }
+
+        header, footer {
+            padding: 1em;
+            color: white;
+            background-color: #051565;
+            clear: left;
+            text-align: center;
+        }
+
+        article {
+            padding: 1em;
+        }
+
+        .esriPopup.modernGrey {
+
+            -webkit-box-shadow: 1px 1px 3px #dbdbdb;
+
+            box-shadow: 1px 1px 3px #dbdbdb;
+
+            -webkit-border-radius: 2px;
+
+            border-radius: 2px;
+
+            font-family: Arial, Helvetica, sans-serif;
+
+            font-size: 12px;
+
+            line-height: 16px;
+
+        }
+
+    </style>
+
+    <link rel="stylesheet" href="https://js.arcgis.com/4.18/esri/themes/light/main.css">
+    <script src="https://js.arcgis.com/4.18/"></script>
+    <script type="text/javascript" src="scripts.js"></script>
+
+    <script>
+        require([
+                "esri/config",
+                "esri/Map",
+                "esri/views/MapView",
+                "esri/layers/FeatureLayer",
+                "esri/widgets/BasemapToggle"
+            ],
+            function (esriConfig,Map, MapView, FeatureLayer, BasemapToggle)
+            {
+
+
+                esriConfig.apiKey = "AAPKb22283c075b244e4ab711e1ac7c5063eccxBTaaDTCktzQSLmUDICzBUuobCyuNJLtjMuR36lxpEWpi93jQiD7eXBZTDzco8";
+
+                let crimeLayer = new FeatureLayer({
+                    url: "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/Crime/FeatureServer",
+                    id: "crime"
+                });
+
+                const map = new Map({
+                    basemap: "arcgis-nova", // Basemap layer service
+                });
+
+
+                map.layers.add(crimeLayer);
+
+                const view = new MapView({
+                    map: map,
+                    center: [-98.734, 40.245],// Longitude, latitude
+                    zoom: 4, // Zoom level
+                    container: "viewDiv" // Div element
+                });
+                // 1 - Create the widget
+                var toggle = new BasemapToggle({
+                    // 2 - Set properties
+                    view: view, // view that provides access to the map's 'topo-vector' basemap
+                    nextBasemap: "Streets" // allows for toggling to the 'hybrid' basemap
+                });
+
+                view.ui.add(toggle, "top-right")
+
+                var popUp = {
+                    // autocasts as new PopupTemplate()
+                    title: "{STATE_NAME}",
+                    content: [
+                        {
+                            type: "fields",
+                            fieldInfos: [
+                                {
+                                    fieldName: "CRMCYPERC",
+                                    label: "personal crime"
+                                },
+                                {
+                                    fieldName: " CRMCYTOTC",
+                                    label:  "total crime index"
+                                }
+
+                            ]
+                        }
+                    ]
+                };
+                crimeLayer.popupTemplate = popUp;
+
+
+            });
+    </script>
+
+</head>
+<body>
+<div class="container">
+    <div id="viewDiv"></div>
+
+
+</div>
+
+</body>
+</html>
