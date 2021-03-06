@@ -1,0 +1,328 @@
+<html xmlns="http://www.w3.org/1999/html">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>Crime Index </title>
+
+    <style>
+        html,
+        body,
+        #viewDiv {
+            padding: 0;
+            margin: 0;
+            height: 100%;
+            width: 100%;
+        }
+
+        #index-filter {
+            height: 160px;
+            width: 100%;
+            visibility: hidden;
+        }
+
+        .index-item {
+            width: 100%;
+            padding: 12px;
+            text-align: center;
+            vertical-align: baseline;
+            cursor: pointer;
+            height: 40px;
+        }
+
+        .index-item:focus {
+            background-color: dimgrey;
+        }
+
+        .index-item:hover {
+            background-color: dimgrey;
+        }
+
+        #titleDiv {
+            padding: 10px;
+        }
+
+        #titleText {
+            font-size: 20pt;
+            font-weight: 60;
+            padding-bottom: 10px;
+        }
+        /**
+             * Hover tooltip
+             */
+
+        .tooltip {
+            position: absolute;
+            pointer-events: none;
+            transition: opacity 200ms;
+        }
+
+        .tooltip > div {
+            margin: 0 auto;
+            padding: 12px;
+            border-radius: 4px;
+            box-shadow: 0px 0px 4px rgba(255, 255, 255, 0.75);
+            transform: translate3d(-50%, -125%, 0);
+        }
+    </style>
+
+    <link rel="stylesheet" href="https://js.arcgis.com/4.18/esri/themes/light/main.css">
+    <script src="https://js.arcgis.com/4.18/"></script>
+    //<script type="text/javascript" src="scripts.js"></script>
+
+    <script>
+        require([
+                "esri/config",
+                "esri/Map",
+                "esri/views/MapView",
+                "esri/core/promiseUtils",
+                "esri/layers/FeatureLayer",
+                "esri/widgets/BasemapToggle",
+                "esri/widgets/Legend",
+                "esir/widgets/Expand"
+            ],
+            function (esriConfig,Map, MapView, promiseUtils, FeatureLayer, BasemapToggle, Legend, Expand)
+            {
+                let indexLayerView;
+
+                esriConfig.apiKey = "AAPKb22283c075b244e4ab711e1ac7c5063eccxBTaaDTCktzQSLmUDICzBUuobCyuNJLtjMuR36lxpEWpi93jQiD7eXBZTDzco8";
+
+                let crimeLayer = new FeatureLayer({
+                    url: "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/Crime/FeatureServer/0",
+                    definitionExpression: "CRMCYTOTC > 0",
+                    outFields: ["*"],
+                    id: "crime",
+                    title: "Crime Index"
+                });
+
+                const map = new Map({
+                    basemap:  "arcgis-nova", // Basemap layer service
+                    layers:[crimeLayer]
+                });
+
+
+              //  map.layers.add(crimeLayer);
+
+                const view = new MapView({
+                    map: map,
+                    center: [-98.734, 40.245],// Longitude, latitude
+                    zoom: 4, // Zoom level
+                    container: "viewDiv" // Div element
+                });
+
+                view.ui.add(new Legend({ view: view }), "bottom-left");
+
+                // When the layerview is available, setup hovering interactivity
+                view.whenLayerView(crimeLayer).then(setupHoverTooltip);
+
+
+                // 1 - Create the widget
+                let toggle = new BasemapToggle({
+                    // 2 - Set properties
+                    view: view, // view that provides access to the map's 'topo-vector' basemap
+                    nextBasemap: "streets" // allows for toggling to the 'hybrid' basemap
+                });
+
+                view.ui.add(toggle, "top-right")
+
+
+                var popUp = {
+                    // autocasts as new PopupTemplate()
+                    title: "Crime Indicies",
+                    content: [
+                        {
+                            type: "fields",
+                            fieldInfos: [
+                                {
+                                    fieldName: " CRMCYTOTC",
+                                    label:  "total crime index"
+                                },
+                                {
+                                    fieldName: "CRMCYPERC",
+                                    label: "personal crime"
+                                }
+                            ]
+                        }
+                    ]
+                };
+                crimeLayer.popupTemplate = popUp;
+
+                /**
+                 * Sets up a moving tooltip that displays
+                 * the crime index.
+                 */
+
+                function setupHoverTooltip(layerview) {
+                    var highlight;
+
+                    var tooltip = createTooltip();
+
+                    var hitTest = promiseUtils.debounce(function(event) {
+                        return view.hitTest(event)
+                            .then(function(hit) {
+                                var results = hit.results.filter(function(result) {
+                                    return result.graphic.layer === crimeLayer;
+                                });
+
+                                if (!results.length) {
+                                    return null;
+                                }
+
+                                return {
+                                    graphic: results[0].graphic,
+                                    screenPoint: hit.screenPoint
+                                };
+                            });
+                    });
+
+                    view.on("pointer-move", function(event) {
+                        return hitTest(event)
+                            .then(function (hit) {
+                                // remove current highlighted feature
+                                if (highlight) {
+                                    highlight.remove();
+                                    highlight = null;
+                                }
+
+                                // highlight the hovered feature
+                                // or hide the tooltip
+                                if (hit) {
+                                    var graphic = hit.graphic;
+                                    var screenPoint = hit.screenPoint;
+
+                                    highlight = layerview.highlight(graphic);
+                                    tooltip.show(screenPoint, "Total Crime Index " + graphic.getAttribute("CRMCYTOTC"));
+                                } else {
+                                    tooltip.hide();
+                                }
+                            }, function () {
+                            });
+                });
+
+                    /**
+                     * Creates a tooltip to display a the crime index.
+                     */
+                    function createTooltip() {
+                        var tooltip = document.createElement("div");
+                        var style = tooltip.style;
+
+                        tooltip.setAttribute("role", "tooltip");
+                        tooltip.classList.add("tooltip");
+
+                        var textElement = document.createElement("div");
+                        textElement.classList.add("esri-widget");
+                        tooltip.appendChild(textElement);
+
+                        view.container.appendChild(tooltip);
+
+                        var x = 0;
+                        var y = 0;
+                        var targetX = 0;
+                        var targetY = 0;
+                        var visible = false;
+
+                        // move the tooltip progressively
+                        function move() {
+                            x += (targetX - x) * 0.1;
+                            y += (targetY - y) * 0.1;
+
+                            if (Math.abs(targetX - x) < 1 && Math.abs(targetY - y) < 1) {
+                                x = targetX;
+                                y = targetY;
+                            } else {
+                                requestAnimationFrame(move);
+                            }
+
+                            style.transform = "translate3d(" + Math.round(x) + "px," + Math.round(y) + "px, 0)";
+                        }
+
+                        return {
+                            show: function(point, text) {
+                                if (!visible) {
+                                    x = point.x;
+                                    y = point.y;
+                                }
+
+                                targetX = point.x;
+                                targetY = point.y;
+                                style.opacity = 1;
+                                visible = true;
+                                textElement.innerHTML = text;
+
+                                move();
+                            },
+
+                            hide: function() {
+                                style.opacity = 0;
+                                visible = false;
+                            }
+                        };
+                    };
+
+
+            }
+                const indexNodes = document.querySelectorAll(`.index-item`);
+                const indexElement = document.getElementById("index-filter");
+
+                // click event handler for seasons choices
+                indexElement.addEventListener("click", filterByIndex);
+
+                // User clicked on Winter, Spring, Summer or Fall
+                // set an attribute filter on flood warnings layer view
+                // to display the warnings issued in that season
+                function filterByIndex(event) {
+                    const selectedIndex = event.target.getAttribute("data-index");
+                    indexLayerView.filter = {
+                        where: "Crime Index = '" + selectedIndex + "'"
+                    };
+                }
+
+                view.whenLayerView(crimeLayer).then(function (layerView) {
+                    // flash flood warnings layer loaded
+                    // get a reference to the flood warnings layerview
+                    indexLayerView = layerView;
+
+                    // set up UI items
+                    indexElement.style.visibility = "visible";
+                    const indexExpand = new Expand({
+                        view: view,
+                        content: indexElement,
+                        expandIconClass: "esri-icon-filter",
+                        group: "top-left"
+                    });
+                    //clear the filters when user closes the expand widget
+                    indexExpand.watch("expanded", function () {
+                        if (!indexExpand.expanded) {
+                            indexLayerView.filter = null;
+                        }
+                    });
+                    view.ui.add(indexExpand, "top-left");
+                    view.ui.add("titleDiv", "top-right");
+                });
+            });
+
+
+    </script>
+
+</head>
+<body>
+<div id="index-filter" class="esri-widget">
+    <div class="index-item visible-index" data-index="CRMCYTOTC">Total Crime Index</div>
+    <div class="index-item visible-index" data-index="CRMCYPERC">Personal Crime Index</div>
+    <div class="index-item visible-index" data-index="CRMCYMURD">Murder Index</div>
+    <div class="index-item visible-index" data-index="CRMCYRAPE">Rape Index</div>
+    <div class="index-item visible-index" data-index="CRMCYROBB">Robbery Index</div>
+    <div class="index-item visible-index" data-index="CRMCYASST">"Assault Index</div>
+    <div class="index-item visible-index" data-index="CRMCYPROC">Property Crime Index</div>
+    <div class="index-item visible-index" data-index="CRMCYBURG">Burglary Index</div>
+    <div class="index-item visible-index" data-index="CRMCYLARC">Larceny Index</div>
+    <div class="index-item visible-index" data-index="CRMCYMVEH">Motor Vehicle Theft Index</div>
+</div>
+ <!-- <div class="container"> -->
+    <div id="viewDiv"></div>
+    <div id="titleDiv" class="esri-widget">
+        <div id="titleText">Crime Index</div>
+        <div>Crime Index</div>
+    </div>
+
+</body>
+</html>

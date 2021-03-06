@@ -1,0 +1,463 @@
+<html xmlns="http://www.w3.org/1999/html">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>Hospital Beds </title>
+
+
+    <style>
+        html,
+        body,
+        #viewDiv {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        #infoDiv {
+            background: white;
+            padding: 10px;
+        }
+        #codeDiv {
+            color: rgb(148, 4, 40);
+            overflow-y: auto;
+            /* overflow: scroll; */
+            max-height: 250px;
+        }
+        #scaleInfo {
+            background: white;
+            padding: 10px;
+            font-family: monospace;
+        }
+        /**
+        * Hover tooltip
+        */
+
+        .tooltip {
+            position: absolute;
+            pointer-events: none;
+            transition: opacity 200ms;
+        }
+
+        .tooltip > div {
+            margin: 0 auto;
+            padding: 12px;
+            border-radius: 4px;
+            box-shadow: 0px 0px 4px rgba(255, 255, 255, 0.75);
+            transform: translate3d(-50%, -125%, 0);
+        }
+    </style>
+
+    <link rel="stylesheet" href="https://js.arcgis.com/4.18/esri/themes/dark/main.css">
+    <script src="https://js.arcgis.com/4.18/"></script>
+    <script type="text/javascript" src="scripts.js"></script>
+
+    <script>
+        require([
+                "esri/config",
+                "esri/Map",
+                "esri/views/MapView",
+                "esri/layers/FeatureLayer",
+                "esri/renderers/SimpleRenderer",
+                "esri/renderers/smartMapping/creators/size",
+                "esri/renderers/visualVariables/SizeVariable",
+                "esri/widgets/Expand",
+                "esri/widgets/Legend",
+                "esri/widgets/Home",
+                "esri/core/promiseUtils",
+                "esri/widgets/BasemapToggle"
+            ],
+            function (esriConfig,
+                      Map,
+                      MapView,
+                      FeatureLayer,
+                      SimpleRenderer,
+                      sizeRendererCreator,
+                      SizeVariable,
+                      Expand,
+                      Legend,
+                      Home,
+                      promiseUtils,
+                      BasemapToggle
+            )
+            {
+                const renderer = new SimpleRenderer({
+                    symbol: {
+                        type: "simple-line",
+                        color: "#8400A8",
+                        width: 3
+                    }
+                });
+
+                esriConfig.apiKey = "AAPKb22283c075b244e4ab711e1ac7c5063eccxBTaaDTCktzQSLmUDICzBUuobCyuNJLtjMuR36lxpEWpi93jQiD7eXBZTDzco8";
+
+                const bedLayer = new FeatureLayer({
+                    url: "https://services7.arcgis.com/LXCny1HyhQCUSueu/arcgis/rest/services/Definitive_Healthcare_USA_Hospital_Beds/FeatureServer/0",
+                    title: "Hospital Beds",
+                    outFields: ["*"]
+                });
+
+                const map = new Map({
+                    basemap: {
+                        portalItem: {
+                            id: "f35ef07c9ed24020aadd65c8a65d3754" // modern antique vector tiles
+                        }
+                    }, // Basemap layer service
+                    layers:[bedLayer]
+                });
+
+                const view = new MapView({
+                    map: map,
+                    center: [-98.734, 40.245],// Longitude, latitude
+                    zoom: 5, // Zoom level
+                    container: "viewDiv", // Div element
+                    extent: {
+                        "spatialReference": {
+                            "latestWkid": 3857,
+                            "wkid": 102100
+                        }
+                    }
+                });
+
+                view.when(toggleAutoSize);
+
+                view.when().then(function(){
+                    layer.when().then(function(){
+                        generateRenderer(false);
+                    });
+                });
+
+                //  add the home button
+                view.ui.add(new Home({ view: view }), "top-left");
+
+                // add the scale info button
+                const scaleInfo = document.getElementById("scaleInfo");
+                const infoExpand = new Expand({
+                    content: scaleInfo,
+                    view: view,
+                    group: "top-left"
+                });
+
+                // where the legend goes
+                view.ui.add(new Expand({
+                    view: view,
+                    content: new Legend({ view: view }),
+                    group: "top-left"
+                }), "top-left");
+
+                view.ui.add(infoExpand, "top-left");
+
+                // where the disable scaling button goes and what it does
+                const infoDiv = document.getElementById("infoDiv");
+                view.ui.add(infoDiv, "top-right");
+
+                const toggleButton = document.getElementById("toggle-auto-size");
+                toggleButton.addEventListener("click", toggleAutoSize);
+
+                const codeElement = document.getElementById("codeDiv");
+
+                const viewScaleElement = document.getElementById("viewScale");
+                const minSizeElement = document.getElementById("minSize");
+                const maxSizeElement = document.getElementById("maxSize");
+
+                let scaleWatchHandle;
+
+                function toggleAutoSize() {
+                    let sizeOptimizationEnabled = false;
+
+                    if (toggleButton.innerText === "Disable auto size by scale") {
+                        toggleButton.innerText = "Enable auto size by scale";
+                        sizeOptimizationEnabled = true;
+                    } else {
+                        toggleButton.innerText = "Disable auto size by scale";
+                        clearInfoDisplay();
+                    }
+
+                    generateRenderer(sizeOptimizationEnabled);
+                }
+
+                function generateRenderer(sizeOptimizationEnabled){
+                    // generates a new renderer with a scale-dependent
+                    // size visual variable to vary icon size by scale
+                    sizeRendererCreator
+                        .createContinuousRenderer({
+                            layer: bedLayer,
+                            view: view,
+                            field: "NUM_LICENSED_BEDS",
+                            sizeOptimizationEnabled: sizeOptimizationEnabled
+                        })
+                        .then(function(rendererResponse) {
+                            // the renderer contains a size variable with stops
+                            // mapping icon sizes to scale values
+                            const renderer = rendererResponse.renderer;
+
+                            bedLayer.renderer = renderer;
+
+                            if(renderer.visualVariables){
+                                const scaleVVs = getScaleVariables(renderer.visualVariables);
+                                const scaleVVsStringified = JSON.stringify(renderer.visualVariables, null, 2);
+
+                                codeElement.innerHTML = `<pre>${scaleVVsStringified}</pre>`;
+
+                                if(scaleVVs.length > 0){
+
+                                    displayScaleAndSizeValues(view.scale);
+
+                                    scaleWatchHandle = view.watch("scale", displayScaleAndSizeValues);
+
+                                    function displayScaleAndSizeValues(scale){
+                                        viewScaleElement.innerHTML = Math.round(scale);
+                                        const effectiveMaxSize = getSizeFromScale(scaleVVs[0].maxSize, scale);
+                                        const effectiveMinSize = getSizeFromScale(scaleVVs[0].minSize, scale);
+                                        minSizeElement.innerHTML = effectiveMinSize.toPrecision(2);
+                                        maxSizeElement.innerHTML = effectiveMaxSize.toPrecision(2);
+                                    }
+                                }
+                            }
+                        })
+                        .catch(function(error) {
+                            console.error(error);
+                        });
+                }
+
+                function getScaleVariables(visualVariables){
+                    return visualVariables.filter(function(vv){
+                        return vv.minSize.valueExpression && vv.minSize.valueExpression === "$view.scale";
+                    });
+                }
+
+                function clearInfoDisplay(){
+                    viewScaleElement.innerHTML = null;
+                    maxSizeElement.innerHTML = null;
+                    minSizeElement.innerHTML = null;
+                    codeElement.innerHTML = null;
+                    scaleWatchHandle.remove();
+                    scaleWatchHandle = null;
+                    infoExpand.expanded = false;
+                }
+
+                function getSizeFromScale(sizeVV, scale){
+                    const sizeStops = sizeVV.stops;
+                    const stopsCount = sizeStops.length;
+                    const finalIndex = stopsCount-1;
+                    const scaleMin = sizeStops[0].value;
+                    const scaleMax = sizeStops[finalIndex].value;
+
+                    if(scale <= scaleMin){
+                        return sizeStops[0].size;
+                    }
+
+                    if(scale >= scaleMax){
+                        return sizeStops[finalIndex].size;
+                    }
+
+                    for (let i = 0; i <= finalIndex; i++) {
+                        const currentStop = sizeStops[i];
+                        const nextStop = sizeStops[i + 1];
+
+                        if (scale >= currentStop.value && scale < nextStop.value) {
+                            const scaleRange = nextStop.value - currentStop.value;
+                            const sizeRange = currentStop.size - nextStop.size;
+                            const relativePosition = (scale - currentStop.value) / scaleRange;
+
+                            const effectiveSize = currentStop.size - (sizeRange * relativePosition);
+                            return effectiveSize;
+                        }
+                    }
+                }
+
+
+                // When the layerview is available, setup hovering interactivity
+                view.whenLayerView(bedLayer).then(setupHoverTooltip);
+
+
+
+                // 1 - Create the widget
+                let baseToggle = new BasemapToggle({
+                    // 2 - Set properties
+                    view: view, // view that provides access to the map's 'topo-vector' basemap
+                    nextBasemap: "streets" // allows for toggling to the 'hybrid' basemap
+                });
+
+                view.ui.add(baseToggle, "bottom-right")
+
+
+                    var popUp = {
+                    // autocasts as new PopupTemplate()
+                    title: " {HOSPITAL_NAME} ",
+                    content: [
+                        {
+                            type: "fields",
+                            fieldInfos: [
+                                {
+                                    fieldName: "NUM_LICENSED_BEDS",
+                                    label:  "# Licensed Beds"
+                                },
+                                {
+                                    fieldName: "NUM_STAFFED_BEDS",
+                                    label: "# Staffed Beds"
+                                },
+                                {
+                                    fieldName: "NUM_ICU_BEDS",
+                                    label: "# ICE Beds"
+                                },
+                                {
+                                    fieldName: "BED_UTILIZATION",
+                                    label: "Bed Utilization Rate"
+                                },
+                                {
+                                    fieldName: "AVG_VENTILATOR_USAGE",
+                                    label: "Avg Ventilator Usage"
+                                },
+                                {
+                                    fieldName: "Potential_Increase_In_Bed_Capac",
+                                    label: "Potential Bed Capacity Increase"
+                                }
+                            ]
+                        }
+                    ]
+                };
+                bedLayer.popupTemplate = popUp;
+
+                /**
+                 * Sets up a moving tooltip that displays
+                 * the crime index.
+                 */
+
+                function setupHoverTooltip(layerview) {
+                    var highlight;
+
+                    var tooltip = createTooltip();
+
+                    var hitTest = promiseUtils.debounce(function(event) {
+                        return view.hitTest(event)
+                            .then(function(hit) {
+                                var results = hit.results.filter(function(result) {
+                                    return result.graphic.layer === bedLayer;
+                                });
+
+                                if (!results.length) {
+                                    return null;
+                                }
+
+                                return {
+                                    graphic: results[0].graphic,
+                                    screenPoint: hit.screenPoint
+                                };
+                            });
+                    });
+
+                    view.on("pointer-move", function(event) {
+                        return hitTest(event)
+                            .then(function (hit) {
+                                // remove current highlighted feature
+                                if (highlight) {
+                                    highlight.remove();
+                                    highlight = null;
+                                }
+
+                                // highlight the hovered feature
+                                // or hide the tooltip
+                                if (hit) {
+                                    var graphic = hit.graphic;
+                                    var screenPoint = hit.screenPoint;
+
+                                    highlight = layerview.highlight(graphic);
+                                    tooltip.show(screenPoint, "Potential Cap + " + graphic.getAttribute("Potential_Increase_In_Bed_Capac"));
+                                } else {
+                                    tooltip.hide();
+                                }
+                            }, function () {
+                            });
+                });
+
+                    /**
+                     * Creates a tooltip to display a the bed capacity increase .
+                     */
+
+                    function createTooltip() {
+                        var tooltip = document.createElement("div");
+                        var style = tooltip.style;
+
+                        tooltip.setAttribute("role", "tooltip");
+                        tooltip.classList.add("tooltip");
+
+                        var textElement = document.createElement("div");
+                        textElement.classList.add("esri-widget");
+                        tooltip.appendChild(textElement);
+
+                        view.container.appendChild(tooltip);
+
+                        var x = 0;
+                        var y = 0;
+                        var targetX = 0;
+                        var targetY = 0;
+                        var visible = false;
+
+                        // move the tooltip progressively
+                        function move() {
+                            x += (targetX - x) * 0.1;
+                            y += (targetY - y) * 0.1;
+
+                            if (Math.abs(targetX - x) < 1 && Math.abs(targetY - y) < 1) {
+                                x = targetX;
+                                y = targetY;
+                            } else {
+                                requestAnimationFrame(move);
+                            }
+
+                            style.transform = "translate3d(" + Math.round(x) + "px," + Math.round(y) + "px, 0)";
+                        }
+
+                        return {
+                            show: function(point, text) {
+                                if (!visible) {
+                                    x = point.x;
+                                    y = point.y;
+                                }
+
+                                targetX = point.x;
+                                targetY = point.y;
+                                style.opacity = 1;
+                                visible = true;
+                                textElement.innerHTML = text;
+
+                                move();
+                            },
+
+                            hide: function() {
+                                style.opacity = 0;
+                                visible = false;
+                            }
+                        };
+                    }
+
+            }
+
+
+            });
+
+
+    </script>
+
+</head>
+<body>
+<div class="container">
+    <div id="viewDiv"></div>
+    <div id="infoDiv" class="esri-widget">
+        <button id="toggle-auto-size" class="esri-button">
+            Enable auto size by scale
+        </button>
+    </div>
+    <div id="scaleInfo">
+        <div id="scaleDiv">View scale: <span id="viewScale"></span></div>
+        <div id="sizeDiv">
+            <div>Min size (pt): <span id="minSize"></span></div>
+            <div>Max size (pt): <span id="maxSize"></span></div>
+        </div>
+        <div id="codeDiv"></div>
+    </div>
+</div>
+
+</body>
+</html>
