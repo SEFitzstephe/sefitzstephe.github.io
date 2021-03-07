@@ -118,7 +118,11 @@
                 let toggle = new BasemapToggle({
                     // 2 - Set properties
                     view: view, // view that provides access to the map's 'topo-vector' basemap
-                    nextBasemap: "streets" // allows for toggling to the 'hybrid' basemap
+                    nextBasemap: {
+                        portalItem:{
+                            id: "50268f0ea8a14f6281cc474423a908e6" // allows for toggling to the 'hybrid' basemap
+                        }
+                    }
                 });
 
                 view.ui.add(toggle, "top-right")
