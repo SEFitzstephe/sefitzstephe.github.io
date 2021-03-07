@@ -98,6 +98,9 @@
                 const bedLayer = new FeatureLayer({
                     url: "https://services7.arcgis.com/LXCny1HyhQCUSueu/arcgis/rest/services/Definitive_Healthcare_USA_Hospital_Beds/FeatureServer/0",
                     title: "Hospital Beds",
+                   symbol: {
+                        type: "simple-fill",
+                        color: "orange"},
                     outFields: ["*"]
                 });
 
@@ -169,11 +172,11 @@
                 function toggleAutoSize() {
                     let sizeOptimizationEnabled = false;
 
-                    if (toggleButton.innerText === "Disable auto size by scale") {
-                        toggleButton.innerText = "Enable auto size by scale";
+                    if (toggleButton.innerText === "Enable auto size by scale") {
+                        toggleButton.innerText = "Disable auto size by scale";
                         sizeOptimizationEnabled = true;
                     } else {
-                        toggleButton.innerText = "Disable auto size by scale";
+                        toggleButton.innerText = "Enable auto size by scale";
                         clearInfoDisplay();
                     }
 
