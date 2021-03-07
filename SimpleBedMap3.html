@@ -82,10 +82,14 @@
             )
             {
                 const renderer = new SimpleRenderer({
+                    type: "simple",
                     symbol: {
-                        type: "simple-line",
-                        color: "#8400A8",
-                        width: 3
+                        type: "simple-fill",
+                        color: "black",
+                        outline: {
+                            width: 0,
+                            color: "#8400A8"
+                        }
                     }
                 });
 
